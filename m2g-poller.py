@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 """Gather Munin statistics and deliver to Carbon for Graphite display."""
 
 import argparse
@@ -79,6 +79,7 @@ class Munin():
         """Initial connection to Munin host."""
         try:
             self._sock = socket.create_connection((self.hostname, self.port), 10)
+            self._sock.settimeout(30)
         except socket.error:
             logger.exception("Thread %s: Unable to connect to Munin host %s, port: %s",
                              self.thread.name, self.hostname, self.port)
