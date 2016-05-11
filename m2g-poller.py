@@ -79,7 +79,7 @@ class Munin():
         """Initial connection to Munin host."""
         try:
             self._sock = socket.create_connection((self.hostname, self.port), 10)
-            self._sock.settimeout(30)
+            self._sock.settimeout(50)
         except socket.error:
             logger.exception("Thread %s: Unable to connect to Munin host %s, port: %s",
                              self.thread.name, self.hostname, self.port)
@@ -232,7 +232,10 @@ class Munin():
                 self.plugins_config[current_plugin] = self.get_config(current_plugin)
                 logger.debug("Thread %s: Plugin Config: %s", self.thread.name, self.plugins_config[current_plugin])
 
-            plugin_data = self.fetch(current_plugin)
+            try:
+                plugin_data = self.fetch(current_plugin)
+            except:
+                continue
             logger.debug("Thread %s: Plugin Data: %s", self.thread.name, plugin_data)
             if self.args.carbon:
                 for multigraph in self.plugins_config[current_plugin]:
@@ -342,7 +345,7 @@ def parse_args():
                         help="Configuration file with list of hosts and their plugins to fetch.")
     parser.add_argument("--host",
                         action="store",
-                        default="localhost",
+                        default="127.0.0.1",
                         help="Munin host to query for stats. You can specify indirect node after ':', "
                              "i.e. --host localhost:remotenode. Default: %(default)s")
     parser.add_argument("--displayname",
