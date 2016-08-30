@@ -81,25 +81,30 @@ class Munin():
             self._sock = socket.create_connection((self.hostname, self.port), 10)
             self._sock.settimeout(50)
         except socket.error:
-            logger.exception("Thread %s: Unable to connect to Munin host %s, port: %s",
+            logger.info("Thread %s: Unable to connect to Munin host %s, port: %s",
                              self.thread.name, self.hostname, self.port)
-            sys.exit(1)
+            return False
+        logger.info("Thread %s: connected to munin", self.thread.name)
 
         try:
             self._conn = self._sock.makefile()
             self.hello_string = self._readline()
         except socket.error:
-            logger.exception("Thread %s: Unable to communicate to Munin host %s, port: %s",
+            logger.info("Thread %s: Unable to communicate to Munin host %s, port: %s",
                              self.thread.name, self.hostname, self.port)
+            self.close_connection()
+            return False
 
         if self.args.carbon:
             self.connect_carbon()
+
+        return True
 
     def connect_carbon(self):
         carbon_host, carbon_port = self.args.carbon.split(":")
         try:
             self._carbon_sock = socket.create_connection((carbon_host, carbon_port), 10)
-        except socket.error:
+        except:
             logger.exception("Thread %s: Unable to connect to Carbon on host %s, port: %s",
                              self.thread.name, carbon_host, carbon_port)
             sys.exit(1)
@@ -125,6 +130,8 @@ class Munin():
             if not current_line:
                 break
             if current_line.startswith("#"):
+                continue
+            if current_line.rstrip().endswith("value"):
                 continue
             if current_line == ".":
                 break
@@ -229,13 +236,18 @@ class Munin():
             try:
                 self.plugins_config[current_plugin]
             except KeyError:
-                self.plugins_config[current_plugin] = self.get_config(current_plugin)
-                logger.debug("Thread %s: Plugin Config: %s", self.thread.name, self.plugins_config[current_plugin])
+                try:
+                    self.plugins_config[current_plugin] = self.get_config(current_plugin)
+                    logger.debug("Thread %s: Plugin Config: %s", self.thread.name, self.plugins_config[current_plugin])
+                except:
+                    return time.time()
 
             try:
                 plugin_data = self.fetch(current_plugin)
             except:
-                continue
+                logger.info("Thread %s: lost connection in process_host_stats() - sleeping 5 seconds", self.thread.name)
+                time.sleep(5)
+                return time.time()
             logger.debug("Thread %s: Plugin Data: %s", self.thread.name, plugin_data)
             if self.args.carbon:
                 for multigraph in self.plugins_config[current_plugin]:
